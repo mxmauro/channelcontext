@@ -2,6 +2,7 @@ package channelcontext
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 )
@@ -13,6 +14,10 @@ type Context[T any] interface {
 
 	DoneValue() T
 }
+
+// -----------------------------------------------------------------------------
+
+var ReceivedMessage = errors.New("received message")
 
 // -----------------------------------------------------------------------------
 
@@ -81,6 +86,7 @@ func (cc *channelContext[T]) monitor() {
 	case v := <-cc.ch:
 		cc.lock.Lock()
 		cc.doneValue = v
+		cc.err = ReceivedMessage
 		cc.lock.Unlock()
 
 	case <-cc.cancelCh:

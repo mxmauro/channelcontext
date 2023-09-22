@@ -1,6 +1,7 @@
 package channelcontext_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/mxmauro/channelcontext"
@@ -19,7 +20,7 @@ func TestChannelCtx(t *testing.T) {
 
 	<-ctx.Done()
 
-	if ctx.Err() != nil || ctx.DoneValue() != 5 {
+	if !errors.Is(ctx.Err(), channelcontext.ReceivedMessage) || ctx.DoneValue() != 5 {
 		t.Fatalf("expected a value of 5 in the done value")
 	}
 }
