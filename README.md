@@ -45,4 +45,4 @@ func main() {
 
 ## LICENSE
 
-See the [license](LICENSE) file for details.
+See [LICENSE](/LICENSE) file for details.
