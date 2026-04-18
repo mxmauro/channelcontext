@@ -6,14 +6,16 @@ Wraps an input channel into a Golang `context.Context` object.
 
 The returned context will act according to the following rules:
 
-1. It is fulfilled as soon as one of the components is fulfilled.
-2. If it involves an error, the merged object will return the same error.
-3. The context object has an additional method that returns the component index that was signalled.
+1. It is fulfilled when either a value is received from the wrapped channel, the wrapped channel is closed, or the returned cancel function is called.
+2. When a value is received, `Err()` returns `nil` and `DoneValue()` returns the received value.
+3. When the channel is closed before a value is received, `Err()` returns `ClosedChannel`.
+4. When canceled, `Err()` returns `context.Canceled`.
+5. Calling `New` with a `nil` channel panics.
 
 
 ## Example
 
-```golang
+```go
 import (
     "github.com/mxmauro/channelcontext"
 )
@@ -34,7 +36,7 @@ func main() {
     // Wait for the context to be fulfilled
     <-ctx.Done()
 
-    // We can retrieve the value that fulfilled the context if no error.
+    // We can retrieve the value that fulfilled the context when no error is reported.
     if ctx.Err() != nil || ctx.DoneValue() != 5 {
         // Signal error
     }

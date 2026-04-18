@@ -9,15 +9,18 @@ import (
 
 // -----------------------------------------------------------------------------
 
+// Context exposes a channel-backed completion signal through the context.Context interface.
 type Context[T any] interface {
 	context.Context
 
+	// DoneValue returns the value received from the wrapped channel after completion.
 	DoneValue() T
 }
 
 // -----------------------------------------------------------------------------
 
-var ReceivedMessage = errors.New("received message")
+// ClosedChannel reports that the wrapped channel closed before producing a value.
+var ClosedChannel = errors.New("closed channel")
 
 // -----------------------------------------------------------------------------
 
@@ -33,10 +36,10 @@ type channelContext[T any] struct {
 
 // -----------------------------------------------------------------------------
 
-// New creates a new context object from the given channel.
+// New creates a channel-backed context and returns it with a cancel function.
 func New[T any](ch <-chan T) (Context[T], context.CancelFunc) {
 	if ch == nil {
-		return nil, nil
+		panic("channelcontext: nil channel")
 	}
 
 	// Create new context
@@ -55,14 +58,17 @@ func New[T any](ch <-chan T) (Context[T], context.CancelFunc) {
 	}
 }
 
+// Deadline reports that this context does not define a deadline.
 func (cc *channelContext[T]) Deadline() (deadline time.Time, ok bool) {
 	return
 }
 
+// Done returns a channel that closes when the wrapped channel completes or the context is canceled.
 func (cc *channelContext[T]) Done() <-chan struct{} {
 	return cc.doneCh
 }
 
+// DoneValue returns the value received from the wrapped channel after completion.
 func (cc *channelContext[T]) DoneValue() T {
 	cc.lock.RLock()
 	defer cc.lock.RUnlock()
@@ -70,6 +76,7 @@ func (cc *channelContext[T]) DoneValue() T {
 	return cc.doneValue
 }
 
+// Err returns the completion error, if the wrapped channel closed or the context was canceled.
 func (cc *channelContext[T]) Err() error {
 	cc.lock.RLock()
 	defer cc.lock.RUnlock()
@@ -77,16 +84,20 @@ func (cc *channelContext[T]) Err() error {
 	return cc.err
 }
 
+// Value reports that this context does not carry request-scoped values.
 func (_ *channelContext[T]) Value(_ any) any {
 	return nil
 }
 
 func (cc *channelContext[T]) monitor() {
 	select {
-	case v := <-cc.ch:
+	case v, ok := <-cc.ch:
 		cc.lock.Lock()
-		cc.doneValue = v
-		cc.err = ReceivedMessage
+		if ok {
+			cc.doneValue = v
+		} else {
+			cc.err = ClosedChannel
+		}
 		cc.lock.Unlock()
 
 	case <-cc.cancelCh:
@@ -96,7 +107,7 @@ func (cc *channelContext[T]) monitor() {
 	}
 
 	close(cc.doneCh)
-	go cc.cancel()
+	cc.cancel()
 }
 
 func (cc *channelContext[T]) cancel() {
